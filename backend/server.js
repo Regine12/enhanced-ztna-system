@@ -27,12 +27,26 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // Middleware
 app.use(cors({
   origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
   credentials: true
 }));
 app.use(express.json());
+
+// test routes
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Enhanced ZTNA Backend is running!',
+    port: PORT,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 
 // Database setup
 const dbPath = path.join(__dirname, 'data', 'ztna.db');
@@ -635,7 +649,7 @@ app.get('/api/webauthn/devices', authenticateToken, (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Enhanced ZTNA Gateway running on port ${PORT}`);
   console.log(`📊 Database: ${dbPath}`);
   console.log(`🧪 Test: curl http://127.0.0.1:${PORT}/api/health`);
