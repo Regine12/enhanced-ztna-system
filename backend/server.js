@@ -13,7 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const JWT_SECRET = 'your-secret-key-for-demo';
 
 const rpName = 'Enhanced ZTNA System';
@@ -635,8 +635,8 @@ app.get('/api/webauthn/devices', authenticateToken, (req, res) => {
 });
 
 // Start server
-app.listen(PORT, 'localhost', () => {
-  console.log(`🚀 Enhanced ZTNA Gateway running on http://127.0.0.1:${PORT}`);
+app.listen(PORT, () => {
+  console.log(`🚀 Enhanced ZTNA Gateway running on port ${PORT}`);
   console.log(`📊 Database: ${dbPath}`);
   console.log(`🧪 Test: curl http://127.0.0.1:${PORT}/api/health`);
   console.log(`📝 Register: POST /api/register`);
