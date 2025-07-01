@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "cd backend && npm start"
+restartPolicyType = "never"
+
+[env]
+NODE_ENV = "production"
+PORT = "3000"

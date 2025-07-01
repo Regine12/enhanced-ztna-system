@@ -1,16 +1,21 @@
 {
   "name": "enhanced-ztna-system",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "backend/server.js",
   "directories": {
     "doc": "docs",
     "test": "tests"
   },
   "scripts": {
+    "start": "cd backend && npm install && npm start",
+    "build": "cd backend && npm install",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["ztna", "webauthn", "zero-trust"],
+  "author": "Regine Cyrille",
   "license": "ISC",
-  "description": ""
+  "description": "Enhanced ZTNA System with WebAuthn"
 }
