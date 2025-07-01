@@ -1,0 +1,412 @@
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const sqlite3 = require('sqlite3').verbose();
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const uuid = require('uuid');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
+
+// Middleware
+app.use(helmet());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
+app.use(morgan('combined'));
+app.use(express.json());
+
+// Database setup
+const dbPath = path.join(__dirname, 'data', 'ztna.db');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening database:', err.message);
+  } else {
+    console.log('Connected to SQLite database');
+    initializeDatabase();
+  }
+});
+
+// Initialize database tables
+function initializeDatabase() {
+  const queries = [
+    `CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_login DATETIME,
+      is_active BOOLEAN DEFAULT 1
+    )`,
+    `CREATE TABLE IF NOT EXISTS user_sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      session_token TEXT UNIQUE NOT NULL,
+      device_fingerprint TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      risk_score INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME,
+      is_active BOOLEAN DEFAULT 1,
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS access_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      session_id TEXT,
+      resource_accessed TEXT,
+      access_granted BOOLEAN,
+      risk_score INTEGER,
+      reason TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users (id),
+      FOREIGN KEY (session_id) REFERENCES user_sessions (id)
+    )`
+  ];
+
+  queries.forEach(query => {
+    db.run(query, (err) => {
+      if (err) {
+        console.error('Error creating table:', err.message);
+      }
+    });
+  });
+}
+
+// Utility functions
+const calculateRiskScore = (req, user, session) => {
+  let risk = 0;
+  
+  // IP address change
+  if (session && session.ip_address !== req.ip) risk += 20;
+  
+  // User agent change
+  if (session && session.user_agent !== req.get('User-Agent')) risk += 15;
+  
+  // Time-based factors
+  if (session) {
+    const now = new Date();
+    const lastActivity = new Date(session.last_activity);
+    const inactiveHours = (now - lastActivity) / (1000 * 60 * 60);
+    
+    if (inactiveHours > 8) risk += 10;
+    if (inactiveHours > 24) risk += 20;
+  }
+  
+  // Add randomness for demo (simulating ML-based risk assessment)
+  risk += Math.floor(Math.random() * 10);
+  
+  return Math.min(risk, 100);
+};
+
+// Routes
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    message: 'Enhanced ZTNA Gateway is running'
+  });
+});
+
+// User Registration
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 12);
+    const userId = uuid.v4();
+
+    db.run(
+      'INSERT INTO users (id, username, email, password_hash) VALUES (?, ?, ?, ?)',
+      [userId, username, email, passwordHash],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE constraint failed')) {
+            return res.status(409).json({ error: 'Username or email already exists' });
+          }
+          return res.status(500).json({ error: 'Registration failed' });
+        }
+        
+        res.status(201).json({ 
+          success: true, 
+          userId,
+          message: 'User registered successfully' 
+        });
+      }
+    );
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Traditional Login (for testing)
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    // Get user
+    db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
+      if (err || !user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Verify password
+      const isValidPassword = await bcrypt.compare(password, user.password_hash);
+      if (!isValidPassword) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Create session
+      const sessionId = uuid.v4();
+      const sessionToken = jwt.sign(
+        { userId: user.id, sessionId, type: 'session' },
+        JWT_SECRET,
+        { expiresIn: '8h' }
+      );
+
+      const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+      const riskScore = calculateRiskScore(req, user, null);
+
+      db.run(
+        `INSERT INTO user_sessions 
+         (id, user_id, session_token, device_fingerprint, ip_address, user_agent, risk_score, expires_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          sessionId,
+          user.id,
+          sessionToken,
+          req.body.deviceFingerprint || '',
+          req.ip,
+          req.get('User-Agent'),
+          riskScore,
+          expiresAt.toISOString()
+        ],
+        (err) => {
+          if (err) {
+            console.error('Error creating session:', err);
+            return res.status(500).json({ error: 'Session creation failed' });
+          }
+
+          // Update last login
+          db.run('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+
+          res.json({
+            success: true,
+            sessionToken,
+            expiresAt: expiresAt.toISOString(),
+            user: {
+              username: user.username,
+              email: user.email
+            },
+            riskScore
+          });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Middleware for protecting routes
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+
+    // Get session details
+    db.get(
+      'SELECT * FROM user_sessions WHERE id = ? AND is_active = 1',
+      [decoded.sessionId],
+      (err, session) => {
+        if (err || !session) {
+          return res.status(403).json({ error: 'Invalid session' });
+        }
+
+        // Check if session is expired
+        if (new Date() > new Date(session.expires_at)) {
+          return res.status(403).json({ error: 'Session expired' });
+        }
+
+        // Calculate current risk score
+        const riskScore = calculateRiskScore(req, null, session);
+        
+        // Update session activity
+        db.run(
+          'UPDATE user_sessions SET last_activity = CURRENT_TIMESTAMP, risk_score = ? WHERE id = ?',
+          [riskScore, session.id]
+        );
+
+        req.user = { userId: decoded.userId, sessionId: decoded.sessionId, riskScore };
+        next();
+      }
+    );
+  });
+};
+
+// Protected resource access
+app.get('/api/protected/resource', authenticateToken, (req, res) => {
+  const { userId, sessionId, riskScore } = req.user;
+  
+  // Log access attempt
+  db.run(
+    'INSERT INTO access_logs (id, user_id, session_id, resource_accessed, access_granted, risk_score, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [uuid.v4(), userId, sessionId, '/api/protected/resource', true, riskScore, req.ip, req.get('User-Agent')]
+  );
+
+  res.json({
+    message: 'Access granted to protected resource',
+    timestamp: new Date().toISOString(),
+    riskScore,
+    data: {
+      sensitiveData: 'This is protected information',
+      userLevel: riskScore < 30 ? 'trusted' : riskScore < 60 ? 'moderate' : 'high-risk',
+      accessCount: Math.floor(Math.random() * 100) + 1
+    }
+  });
+});
+
+// Continuous authentication check
+app.post('/api/verify-session', authenticateToken, (req, res) => {
+  const { riskScore, sessionId } = req.user;
+  
+  let status = 'valid';
+  let requiresReauth = false;
+  
+  if (riskScore > 70) {
+    status = 'high-risk';
+    requiresReauth = true;
+  } else if (riskScore > 40) {
+    status = 'moderate-risk';
+  }
+
+  res.json({
+    status,
+    riskScore,
+    requiresReauth,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Get user dashboard data
+app.get('/api/dashboard', authenticateToken, (req, res) => {
+  const { userId, sessionId } = req.user;
+  
+  // Get user info, recent access logs, and session info
+  db.get('SELECT username, email, last_login FROM users WHERE id = ?', [userId], (err, user) => {
+    if (err || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    db.all(
+      'SELECT * FROM access_logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT 10',
+      [userId],
+      (err, logs) => {
+        if (err) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        db.get(
+          'SELECT risk_score, created_at, last_activity FROM user_sessions WHERE id = ?',
+          [sessionId],
+          (err, session) => {
+            if (err) {
+              return res.status(500).json({ error: 'Session error' });
+            }
+
+            res.json({
+              user,
+              session,
+              recentActivity: logs
+            });
+          }
+        );
+      }
+    );
+  });
+});
+
+// Analytics endpoint for thesis data
+app.get('/api/analytics', authenticateToken, (req, res) => {
+  const queries = {
+    totalUsers: 'SELECT COUNT(*) as count FROM users',
+    totalSessions: 'SELECT COUNT(*) as count FROM user_sessions',
+    accessAttempts: 'SELECT COUNT(*) as count FROM access_logs',
+    avgRiskScore: 'SELECT AVG(risk_score) as avg FROM user_sessions WHERE is_active = 1'
+  };
+
+  const results = {};
+  const queryKeys = Object.keys(queries);
+  let completed = 0;
+
+  queryKeys.forEach(key => {
+    db.all(queries[key], (err, rows) => {
+      if (!err) {
+        results[key] = rows;
+      }
+      completed++;
+      
+      if (completed === queryKeys.length) {
+        res.json(results);
+      }
+    });
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Enhanced ZTNA Gateway server running on port ${PORT}`);
+  console.log(`📊 Database: ${dbPath}`);
+  console.log(`🔗 API Base URL: http://localhost:${PORT}/api`);
+  console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\nShutting down gracefully...');
+  db.close((err) => {
+    if (err) {
+      console.error(err.message);
+    } else {
+      console.log('Database connection closed.');
+    }
+    process.exit(0);
+  });
+});
