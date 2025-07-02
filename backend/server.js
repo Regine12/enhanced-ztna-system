@@ -30,7 +30,12 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000', 
+    'https://enhanced-ztna-system.vercel.app',
+    'https://enhanced-ztna-system-git-main-regines-projects-00e20a20.vercel.app'
+  ],
   credentials: true
 }));
 app.use(express.json());
