@@ -17,9 +17,12 @@ const PORT = process.env.PORT || 3001;
 const JWT_SECRET = 'your-secret-key-for-demo';
 
 const rpName = 'Enhanced ZTNA System';
-const rpID = 'localhost';
-const origin = 'http://localhost:3000';
-const challengeStore = new Map();
+const rpID = process.env.NODE_ENV === 'production' 
+  ? 'enhanced-ztna-system.vercel.app' 
+  : 'localhost';
+const origin = process.env.NODE_ENV === 'production'
+  ? 'https://enhanced-ztna-system.vercel.app'
+  : 'http://localhost:3000';
 
 // Add debugging middleware
 app.use((req, res, next) => {
