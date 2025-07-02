@@ -241,9 +241,7 @@
 
     <script>
         let currentToken = null;
-        const API_BASE = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3001/api' 
-        : 'https://enhanced-ztna-backend.onrender.com'; 
+        const API_BASE = 'https://enhanced-ztna-backend.onrender.com/api';
         
         function showNotification(message, type = 'info') {
             const notification = document.createElement('div');
