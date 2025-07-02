@@ -656,6 +656,29 @@ app.get('/api/webauthn/devices', authenticateToken, (req, res) => {
   );
 });
 
+// Admin endpoint to view data
+app.get('/api/admin/stats', (req, res) => {
+  db.all('SELECT id, username, email, created_at FROM users ORDER BY created_at DESC', (err, users) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    db.all('SELECT COUNT(*) as count FROM user_authenticators WHERE is_active = 1', (err2, devices) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      
+      res.json({
+        totalUsers: users.length,
+        users: users.map(u => ({
+          id: u.id,
+          username: u.username,
+          email: u.email,
+          registeredAt: u.created_at
+        })),
+        totalDevices: devices[0].count,
+        lastUpdated: new Date().toISOString()
+      });
+    });
+  });
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Enhanced ZTNA Gateway running on port ${PORT}`);
