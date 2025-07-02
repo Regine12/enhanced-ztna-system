@@ -11,6 +11,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+// for webauthn
+const challengeStore = new Map();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,11 +37,12 @@ app.use((req, res, next) => {
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'http://127.0.0.1:3000', 
     'https://enhanced-ztna-system.vercel.app',
     'https://enhanced-ztna-system-git-main-regines-projects-00e20a20.vercel.app'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
