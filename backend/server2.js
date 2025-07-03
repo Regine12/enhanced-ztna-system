@@ -11,25 +11,27 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-
-// WebAuthn challenge store
+// for webauthn
 const challengeStore = new Map();
-
-// Failed login attempts tracking
-const failedAttempts = new Map();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-for-demo';
+const JWT_SECRET = 'your-secret-key-for-demo';
 
-// WebAuthn configuration
-const rpName = 'ZTNA Security Gateway';
+const rpName = 'Enhanced ZTNA System';
 const rpID = process.env.NODE_ENV === 'production' 
   ? 'enhanced-ztna-system.vercel.app' 
   : 'localhost';
 const origin = process.env.NODE_ENV === 'production'
   ? 'https://enhanced-ztna-system.vercel.app'
   : 'http://localhost:3000';
+
+// Add debugging middleware
+app.use((req, res, next) => {
+  console.log(`🔍 ${req.method} ${req.path} - ${new Date().toLocaleTimeString()}`);
+  next();
+});
+
 
 // Middleware
 app.use(cors({
@@ -42,25 +44,28 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
 app.use(express.json());
 
-// Request logging
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - ${new Date().toLocaleTimeString()}`);
-  next();
+// test routes
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Enhanced ZTNA Backend is running!',
+    port: PORT,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/ping', (req, res) => {
+  res.send('pong');
 });
 
 // Database setup
-const dbPath = process.env.NODE_ENV === 'production' 
-  ? '/tmp/database.db'
-  : path.join(__dirname, 'data', 'ztna.db');
-
+const dbPath = path.join(__dirname, 'data', 'ztna.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
-    console.error('Database error:', err);
+    console.error('❌ Database error:', err);
   } else {
-    console.log('Database connected:', dbPath);
+    console.log('✅ Database connected:', dbPath);
     initDB();
   }
 });
@@ -74,7 +79,6 @@ function initDB() {
       password_hash TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       last_login DATETIME,
-      failed_attempts INTEGER DEFAULT 0,
       is_active BOOLEAN DEFAULT 1
     )`,
     `CREATE TABLE IF NOT EXISTS sessions (
@@ -111,17 +115,17 @@ function initDB() {
       FOREIGN KEY (user_id) REFERENCES users (id)
     )`,
     `CREATE TABLE IF NOT EXISTS user_authenticators (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      credential_id TEXT UNIQUE NOT NULL,
-      credential_public_key TEXT NOT NULL,
-      counter INTEGER DEFAULT 0,
-      device_name TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_used DATETIME,
-      is_active BOOLEAN DEFAULT 1,
-      FOREIGN KEY (user_id) REFERENCES users (id)
-    )`
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  credential_id TEXT UNIQUE NOT NULL,
+  credential_public_key TEXT NOT NULL,
+  counter INTEGER DEFAULT 0,
+  device_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_used DATETIME,
+  is_active BOOLEAN DEFAULT 1,
+  FOREIGN KEY (user_id) REFERENCES users (id)
+   )`
   ];
 
   tables.forEach(sql => {
@@ -130,51 +134,24 @@ function initDB() {
     });
   });
   
-  console.log('Database tables initialized');
-}
-
-// Helper functions
-function trackFailedAttempt(username, ip) {
-  const key = `${username}_${ip}`;
-  const attempts = failedAttempts.get(key) || [];
-  attempts.push(new Date());
-  
-  // Keep only attempts from last 15 minutes
-  const recent = attempts.filter(time => Date.now() - time.getTime() < 15 * 60 * 1000);
-  failedAttempts.set(key, recent);
-  
-  // Update database
-  db.run('UPDATE users SET failed_attempts = failed_attempts + 1 WHERE username = ?', [username]);
-}
-
-function getFailedAttempts(username, ip) {
-  const key = `${username}_${ip}`;
-  const attempts = failedAttempts.get(key) || [];
-  return attempts.filter(time => Date.now() - time.getTime() < 15 * 60 * 1000).length;
-}
-
-function clearFailedAttempts(username, ip) {
-  const key = `${username}_${ip}`;
-  failedAttempts.delete(key);
-  db.run('UPDATE users SET failed_attempts = 0 WHERE username = ?', [username]);
+  console.log('✅ Database tables initialized');
 }
 
 const calculateRiskScore = (req, session = null, username = null) => {
   let risk = 0;
   
-  // Failed login attempts (high impact)
+  // Failed login attempts (NEW)
   if (username) {
     const recentFailures = getFailedAttempts(username, req.ip);
-    risk += recentFailures * 20; // 20 points per failed attempt
+    risk += recentFailures * 15; // 15 points per failed attempt
   }
   
-  // Time-based risk (outside business hours)
-  const hour = new Date().getHours();
-  if (hour < 7 || hour > 19) risk += 25; // Outside 7 AM - 7 PM
+  // Base risk (simulating ML algorithm)
+  risk += Math.floor(Math.random() * 10);
   
-  // Weekend access
-  const day = new Date().getDay();
-  if (day === 0 || day === 6) risk += 15; // Weekend access
+  // Time-based risk (NEW - more realistic)
+  const hour = new Date().getHours();
+  if (hour < 6 || hour > 22) risk += 25; // Outside business hours
   
   // IP address change risk
   if (session && session.ip_address && session.ip_address !== req.ip) {
@@ -196,11 +173,41 @@ const calculateRiskScore = (req, session = null, username = null) => {
     if (hoursInactive > 6) risk += 25;
   }
   
-  // Random base risk (simulating behavioral analysis)
-  risk += Math.floor(Math.random() * 10);
-  
   return Math.min(risk, 100);
 };
+
+// // Utility functions
+// const calculateRiskScore = (req, session = null) => {
+//   let risk = 0;
+  
+//   // Base risk (simulating ML algorithm)
+//   risk += Math.floor(Math.random() * 15);
+  
+//   // IP address change risk
+//   if (session && session.ip_address && session.ip_address !== req.ip) {
+//     risk += 25;
+//   }
+  
+//   // User agent change risk
+//   if (session && session.user_agent && session.user_agent !== req.get('User-Agent')) {
+//     risk += 20;
+//   }
+  
+//   // Time-based risk (session age)
+//   if (session && session.last_activity) {
+//     const now = new Date();
+//     const lastActivity = new Date(session.last_activity);
+//     const hoursInactive = (now - lastActivity) / (1000 * 60 * 60);
+    
+//     if (hoursInactive > 4) risk += 10;
+//     if (hoursInactive > 12) risk += 20;
+//   }
+  
+//   // Geographic risk (simulated - in real implementation would use IP geolocation)
+//   if (Math.random() > 0.8) risk += 15; // 20% chance of "unusual location"
+  
+//   return Math.min(risk, 100);
+// };
 
 const logRiskEvent = (userId, eventType, riskValue, description) => {
   db.run(
@@ -210,30 +217,21 @@ const logRiskEvent = (userId, eventType, riskValue, description) => {
 };
 
 // Routes
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'ZTNA Security Gateway API',
-    status: 'operational',
-    version: '2.0.0',
-    timestamp: new Date().toISOString()
-  });
+
+// Test route
+app.get('/test', (req, res) => {
+  console.log('✅ Test route hit');
+  res.json({ message: 'Server working!', timestamp: new Date() });
 });
 
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    message: 'ZTNA Security Gateway',
-    version: '2.0.0'
-  });
-});
-
+// Health check
 app.get('/api/health', (req, res) => {
+  console.log('✅ Health check');
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    message: 'ZTNA Security Gateway API',
-    version: '2.0.0'
+    message: 'Enhanced ZTNA Gateway',
+    version: '1.0.0'
   });
 });
 
@@ -241,21 +239,10 @@ app.get('/api/health', (req, res) => {
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    console.log('Registration attempt:', username);
+    console.log('📝 Registration attempt:', username);
     
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'Username, email, and password required' });
-    }
-
-    // Password validation
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
-    }
-
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>])/.test(password)) {
-      return res.status(400).json({ 
-        error: 'Password must contain uppercase, lowercase, number, and special character' 
-      });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -273,7 +260,7 @@ app.post('/api/register', async (req, res) => {
           return res.status(500).json({ error: 'Registration failed' });
         }
         
-        console.log('User registered:', username);
+        console.log('✅ User registered:', username);
         res.status(201).json({ 
           success: true, 
           userId,
@@ -292,7 +279,7 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    console.log('Login attempt:', username);
+    console.log('🔐 Login attempt:', username);
 
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password required' });
@@ -305,23 +292,22 @@ app.post('/api/login', async (req, res) => {
       }
       
       if (!user) {
-        console.log('User not found:', username);
+        console.log('❌ User not found:', username);
         trackFailedAttempt(username, req.ip);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
-        console.log('Invalid password for:', username);
+        console.log('❌ Invalid password for:', username);
         trackFailedAttempt(username, req.ip);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      // Clear failed attempts on successful login
-      clearFailedAttempts(username, req.ip);
-
       // Calculate initial risk score
       const riskScore = calculateRiskScore(req, null, username);
+     // Clear failed attempts on successful login
+      failedAttempts.delete(`${username}_${req.ip}`);
       
       // Create session
       const sessionId = uuidv4();
@@ -350,7 +336,7 @@ app.post('/api/login', async (req, res) => {
           // Log risk event
           logRiskEvent(user.id, 'login', riskScore, `Login from ${req.ip}`);
 
-          console.log('Login successful:', username, 'Risk:', riskScore);
+          console.log('✅ Login successful:', username, 'Risk:', riskScore);
           
           res.json({
             success: true,
@@ -374,6 +360,26 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Track failed login attempts
+const failedAttempts = new Map(); // Store failed attempts temporarily
+
+// Add this helper function
+function trackFailedAttempt(username, ip) {
+  const key = `${username}_${ip}`;
+  const attempts = failedAttempts.get(key) || [];
+  attempts.push(new Date());
+  
+  // Keep only attempts from last 15 minutes
+  const recent = attempts.filter(time => Date.now() - time.getTime() < 15 * 60 * 1000);
+  failedAttempts.set(key, recent);
+}
+
+function getFailedAttempts(username, ip) {
+  const key = `${username}_${ip}`;
+  const attempts = failedAttempts.get(key) || [];
+  return attempts.filter(time => Date.now() - time.getTime() < 15 * 60 * 1000).length;
+}
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -404,7 +410,7 @@ const authenticateToken = (req, res, next) => {
         }
 
         // Calculate current risk score (continuous authentication)
-        const currentRisk = calculateRiskScore(req, session, decoded.username);
+        const currentRisk = calculateRiskScore(req, session);
         
         // Update session activity and risk
         db.run(
@@ -429,7 +435,7 @@ const authenticateToken = (req, res, next) => {
 app.get('/api/protected/resource', authenticateToken, (req, res) => {
   const { userId, sessionId, riskScore, username } = req.user;
   
-  console.log(`Protected access by ${username}, risk: ${riskScore}`);
+  console.log(`🔐 Protected access by ${username}, risk: ${riskScore}`);
   
   // Log access attempt
   const accessId = uuidv4();
@@ -438,7 +444,7 @@ app.get('/api/protected/resource', authenticateToken, (req, res) => {
     [accessId, userId, sessionId, '/api/protected/resource', true, riskScore, req.ip]
   );
 
-  // Log high risk events
+  // Log risk event if high risk
   if (riskScore > 50) {
     logRiskEvent(userId, 'high_risk_access', riskScore, `High risk access to protected resource`);
   }
@@ -449,19 +455,18 @@ app.get('/api/protected/resource', authenticateToken, (req, res) => {
     riskScore,
     riskLevel: riskScore < 30 ? 'LOW' : riskScore < 60 ? 'MEDIUM' : 'HIGH',
     data: {
-      sensitiveData: 'Confidential company information accessed',
+      sensitiveData: 'This is confidential company information',
       documentId: 'DOC-' + Math.random().toString(36).substr(2, 9),
       accessLevel: riskScore < 40 ? 'FULL' : 'LIMITED'
     },
     security: {
       continuousAuthEnabled: true,
-      nextVerificationIn: Math.max(300 - riskScore * 2, 30) + ' seconds',
-      additionalAuthRequired: riskScore > 70
+      nextVerificationIn: Math.max(300 - riskScore * 2, 30) + ' seconds'
     }
   });
 });
 
-// Session verification
+// Session verification (continuous authentication)
 app.post('/api/verify-session', authenticateToken, (req, res) => {
   const { riskScore } = req.user;
   
@@ -488,10 +493,11 @@ app.post('/api/verify-session', authenticateToken, (req, res) => {
   });
 });
 
-// Dashboard endpoint
+// User dashboard
 app.get('/api/dashboard', authenticateToken, (req, res) => {
   const { userId } = req.user;
   
+  // Get user info
   db.get('SELECT username, email, last_login, created_at FROM users WHERE id = ?', [userId], (err, user) => {
     if (err || !user) {
       return res.status(404).json({ error: 'User not found' });
@@ -537,14 +543,26 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
   });
 });
 
-// Analytics endpoint
+// Analytics for thesis data
 app.get('/api/analytics', authenticateToken, (req, res) => {
   const queries = [
     { name: 'totalUsers', sql: 'SELECT COUNT(*) as count FROM users' },
     { name: 'activeSessions', sql: 'SELECT COUNT(*) as count FROM sessions WHERE is_active = 1' },
     { name: 'totalAccess', sql: 'SELECT COUNT(*) as count FROM access_logs' },
     { name: 'avgRiskScore', sql: 'SELECT AVG(risk_score) as avg FROM access_logs WHERE risk_score > 0' },
-    { name: 'highRiskEvents', sql: 'SELECT COUNT(*) as count FROM access_logs WHERE risk_score > 60' }
+    { name: 'highRiskEvents', sql: 'SELECT COUNT(*) as count FROM access_logs WHERE risk_score > 60' },
+    { name: 'riskDistribution', sql: `
+      SELECT 
+        CASE 
+          WHEN risk_score < 30 THEN 'LOW'
+          WHEN risk_score < 60 THEN 'MEDIUM'
+          ELSE 'HIGH'
+        END as level,
+        COUNT(*) as count
+      FROM access_logs 
+      WHERE risk_score > 0
+      GROUP BY level
+    ` }
   ];
 
   const results = { timestamp: new Date().toISOString() };
@@ -553,16 +571,35 @@ app.get('/api/analytics', authenticateToken, (req, res) => {
   queries.forEach(query => {
     db.all(query.sql, (err, rows) => {
       if (!err) {
-        results[query.name] = rows[0] || {};
+        results[query.name] = query.name === 'riskDistribution' ? rows : (rows[0] || {});
       }
       completed++;
       
       if (completed === queries.length) {
-        console.log('Analytics data requested');
+        console.log('📊 Analytics data requested');
         res.json(results);
       }
     });
   });
+});
+
+// Get all users (admin function)
+app.get('/api/admin/users', authenticateToken, (req, res) => {
+  db.all(
+    'SELECT id, username, email, created_at, last_login, is_active FROM users ORDER BY created_at DESC',
+    (err, users) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json({ users, count: users.length });
+    }
+  );
+});
+
+// Error handling
+app.use((err, req, res, next) => {
+  console.error('❌ Server error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // WebAuthn Registration Start
@@ -596,7 +633,7 @@ app.post('/api/webauthn/register/begin', authenticateToken, async (req, res) => 
         });
 
         challengeStore.set(userId, options.challenge);
-        console.log('WebAuthn registration started for:', req.user.username);
+        console.log('🔐 WebAuthn registration started for:', req.user.username);
         res.json(options);
       }
     );
@@ -647,7 +684,7 @@ app.post('/api/webauthn/register/finish', authenticateToken, async (req, res) =>
           }
 
           challengeStore.delete(userId);
-          console.log('WebAuthn device registered for:', req.user.username);
+          console.log('✅ WebAuthn device registered for:', req.user.username);
           
           res.json({ 
             verified: true, 
@@ -693,43 +730,81 @@ app.get('/api/admin/stats', (req, res) => {
     db.all('SELECT COUNT(*) as count FROM user_authenticators WHERE is_active = 1', (err2, devices) => {
       if (err2) return res.status(500).json({ error: err2.message });
       
-      db.all('SELECT COUNT(*) as count FROM access_logs', (err3, accesses) => {
-        if (err3) return res.status(500).json({ error: err3.message });
-        
-        res.json({
-          totalUsers: users.length,
-          users: users.map(u => ({
-            username: u.username,
-            email: u.email,
-            registeredAt: new Date(u.created_at).toLocaleString()
-          })),
-          totalDevices: devices[0].count,
-          totalAccesses: accesses[0].count,
-          lastUpdated: new Date().toISOString()
-        });
+      res.json({
+        totalUsers: users.length,
+        users: users.map(u => ({
+          id: u.id,
+          username: u.username,
+          email: u.email,
+          registeredAt: u.created_at
+        })),
+        totalDevices: devices[0].count,
+        lastUpdated: new Date().toISOString()
       });
     });
   });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
+// Risk simulation endpoint for demos
+app.post('/api/simulate-risk', authenticateToken, (req, res) => {
+  const { riskType, riskLevel } = req.body;
+  const { userId, username } = req.user;
+  
+  const scenarios = {
+    'suspicious_location': {
+      message: '🚨 Suspicious login detected from unusual location (Nigeria)',
+      riskScore: riskLevel || 85,
+      requiredAction: 'Additional verification required'
+    },
+    'multiple_devices': {
+      message: '⚠️ Multiple concurrent sessions detected from different devices',
+      riskScore: riskLevel || 70,
+      requiredAction: 'Device verification recommended'
+    },
+    'unusual_time': {
+      message: '🌙 Access attempt at 3:47 AM - outside normal hours',
+      riskScore: riskLevel || 60,
+      requiredAction: 'Enhanced monitoring enabled'
+    },
+    'failed_attempts': {
+      message: '🔒 Multiple failed login attempts detected',
+      riskScore: riskLevel || 75,
+      requiredAction: 'Account temporarily restricted'
+    }
+  };
+  
+  const scenario = scenarios[riskType] || scenarios['suspicious_location'];
+  
+  // Log the risk event
+  logRiskEvent(userId, riskType, scenario.riskScore, scenario.message);
+  
+  console.log(`🚨 Risk simulation: ${riskType} for user ${username}`);
+  
+  res.json({
+    alert: true,
+    riskScore: scenario.riskScore,
+    riskLevel: scenario.riskScore > 70 ? 'HIGH' : 'MEDIUM',
+    message: scenario.message,
+    requiredAction: scenario.requiredAction,
+    timestamp: new Date().toISOString(),
+    recommendations: [
+      'Enable WebAuthn for stronger authentication',
+      'Review recent account activity',
+      'Consider changing password if unauthorized access suspected',
+      'Contact security team if you did not initiate this activity'
+    ]
+  });
 });
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 ZTNA Security Gateway running on port ${PORT}`);
+  console.log(`🚀 Enhanced ZTNA Gateway running on port ${PORT}`);
   console.log(`📊 Database: ${dbPath}`);
-  console.log(`🔗 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🛡️  WebAuthn RP ID: ${rpID}`);
-  console.log(`🌐 Origin: ${origin}`);
+  console.log(`🧪 Test: curl http://127.0.0.1:${PORT}/api/health`);
+  console.log(`📝 Register: POST /api/register`);
+  console.log(`🔐 Login: POST /api/login`);
+  console.log(`🛡️  Protected: GET /api/protected/resource`);
+  console.log(`📈 Analytics: GET /api/analytics`);
 });
 
 // Graceful shutdown
