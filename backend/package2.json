@@ -1,7 +1,7 @@
 {
-  "name": "ztna-security-gateway",
-  "version": "2.0.0",
-  "description": "Zero Trust Network Access with WebAuthn & Continuous Authentication",
+  "name": "enhanced-ztna-backend",
+  "version": "1.0.0",
+  "description": "Enhanced ZTNA System Backend with Continuous Authentication",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -13,9 +13,7 @@
     "webauthn",
     "zero-trust",
     "security",
-    "authentication",
-    "biometric",
-    "fido2"
+    "authentication"
   ],
   "author": "Regine Cyrille",
   "license": "MIT",
@@ -34,8 +32,5 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

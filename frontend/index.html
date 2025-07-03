@@ -3,116 +3,620 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced ZTNA System</title>
+    <title>ZTNA Security Gateway</title>
+    <script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@8.3.3/dist/bundle/index.umd.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: #1e293b;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        
+        /* Landing Page Styles */
+        .landing-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .hero {
+            text-align: center;
             max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 4rem 2rem;
         }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 1rem;
+            letter-spacing: -0.025em;
         }
-        .form-group {
-            margin-bottom: 15px;
+        
+        .hero .subtitle {
+            font-size: 1.25rem;
+            color: #475569;
+            margin-bottom: 1rem;
+            font-weight: 400;
         }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+        
+        .hero .principle {
+            font-size: 1.5rem;
+            color: #3b82f6;
+            font-weight: 600;
+            margin-bottom: 3rem;
+            font-style: italic;
         }
-        input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            box-sizing: border-box;
+        
+        .hero .description {
+            font-size: 1.125rem;
+            color: #64748b;
+            margin-bottom: 3rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
-        button {
-            background: #007bff;
+        
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: #3b82f6;
             color: white;
-            padding: 12px 20px;
             border: none;
-            border-radius: 5px;
+            padding: 0.875rem 2rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
-            margin-right: 10px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 2px solid transparent;
         }
-        button:hover {
-            background: #0056b3;
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
         }
+        
+        .btn-primary { background: #3b82f6; }
+        .btn-primary:hover { background: #2563eb; }
+        
+        .btn-secondary { 
+            background: transparent; 
+            color: #3b82f6; 
+            border: 2px solid #3b82f6;
+        }
+        .btn-secondary:hover { 
+            background: #3b82f6; 
+            color: white;
+        }
+        
+        .btn-success { background: #10b981; }
+        .btn-success:hover { background: #059669; }
+        
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #d1d5db;
+            color: #374151;
+        }
+        .btn-outline:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+        }
+        
+        .btn-danger { background: #ef4444; }
+        .btn-danger:hover { background: #dc2626; }
+        
+        .btn-accent { 
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%); 
+        }
+        .btn-accent:hover { 
+            background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%); 
+        }
+        
+        /* Auth Section Styles */
+        .auth-section { display: none; min-height: 100vh; padding: 4rem 0; }
+        
+        .auth-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .auth-header h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+        
+        .auth-header p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .form-group { margin-bottom: 1.5rem; }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            background: #ffffff;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .password-requirements {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        
+        .requirement {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .requirement.valid { color: #10b981; }
+        .requirement.invalid { color: #ef4444; }
+        
+        .auth-footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .auth-footer a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Protected Section Styles */
+        .protected-section { display: none; padding: 2rem 0; }
+        
+        .top-nav {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .nav-brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: #64748b;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .risk-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .risk-low { background: #dcfce7; color: #166534; }
+        .risk-medium { background: #fef3c7; color: #92400e; }
+        .risk-high { background: #fee2e2; color: #991b1b; }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .section-title h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .section-title i {
+            color: #3b82f6;
+            font-size: 1.125rem;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+        
+        .device-list {
+            margin-top: 1.5rem;
+        }
+        
+        .device-item {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .device-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .device-icon {
+            background: #3b82f6;
+            color: white;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .device-details h4 {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .device-details p {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
         .response {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 5px;
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.875rem;
+            max-height: 400px;
+            overflow-y: auto;
             white-space: pre-wrap;
         }
-        .success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
+        
+        .response.success { 
+            background: #f0fdf4; 
+            border: 1px solid #bbf7d0; 
+            color: #166534; 
         }
-        .error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
+        
+        .response.error { 
+            background: #fef2f2; 
+            border: 1px solid #fecaca; 
+            color: #991b1b; 
         }
-        .info {
-            background: #d1ecf1;
-            border: 1px solid #bee5eb;
-            color: #0c5460;
+        
+        .response.info { 
+            background: #eff6ff; 
+            border: 1px solid #bfdbfe; 
+            color: #1e40af; 
         }
-        .risk-low { color: green; font-weight: bold; }
-        .risk-medium { color: orange; font-weight: bold; }
-        .risk-high { color: red; font-weight: bold; }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .notification.success { background: #10b981; }
+        .notification.error { background: #ef4444; }
+        .notification.info { background: #3b82f6; }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            border: 1px solid;
+        }
+        
+        .alert-info {
+            background: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1e40af;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .cta-buttons { flex-direction: column; align-items: center; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .btn-group { flex-direction: column; }
+            .nav-content { flex-direction: column; gap: 1rem; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🛡️ Enhanced ZTNA System</h1>
-        <p>Zero Trust Network Access with Continuous Authentication</p>
-        
-        <div id="authSection">
-            <h2>Authentication</h2>
-            
-            <h3>Register New User</h3>
-            <div class="form-group">
-                <label>Username:</label>
-                <input type="text" id="regUsername" placeholder="Enter username">
+    <!-- Landing Page -->
+    <div id="landingSection" class="landing-section">
+        <div class="container">
+            <div class="hero">
+                <h1>ZTNA Security Gateway</h1>
+                <p class="subtitle">Zero Trust Network Access with Advanced Authentication</p>
+                <p class="principle">"Never Trust, Always Verify"</p>
+                <p class="description">
+                    Experience next-generation security with our Zero Trust Network Access platform. 
+                    Featuring biometric authentication, continuous risk assessment, and adaptive access controls 
+                    to protect your organization's most valuable assets.
+                </p>
+                <div class="cta-buttons">
+                    <button class="btn btn-primary" onclick="showLogin()">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </button>
+                    <button class="btn btn-secondary" onclick="showSignup()">
+                        <i class="fas fa-user-plus"></i> Create Account
+                    </button>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Email:</label>
-                <input type="email" id="regEmail" placeholder="Enter email">
+        </div>
+    </div>
+
+    <!-- Login Section -->
+    <div id="loginSection" class="auth-section">
+        <div class="container">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h2>Welcome Back</h2>
+                    <p>Sign in to access the security gateway</p>
+                </div>
+                <div class="card">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="loginUsername" placeholder="Enter your username">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="loginPassword" placeholder="Enter your password">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="login()" style="width: 100%;">
+                            <i class="fas fa-key"></i> Sign In
+                        </button>
+                        <button class="btn btn-accent" onclick="loginWithWebAuthn()" style="width: 100%;">
+                            <i class="fas fa-fingerprint"></i> Biometric Login
+                        </button>
+                    </div>
+                </div>
+                <div class="auth-footer">
+                    <p>
+                        <a href="#" onclick="alert('Password reset feature coming soon!')">Forgot Password?</a> | 
+                        <a href="#" onclick="showSignup()">Need an account?</a> | 
+                        <a href="#" onclick="showLanding()">Back to Home</a>
+                    </p>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Password:</label>
-                <input type="password" id="regPassword" placeholder="Enter password">
+        </div>
+    </div>
+
+    <!-- Signup Section -->
+    <div id="signupSection" class="auth-section">
+        <div class="container">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <h2>Create Account</h2>
+                    <p>Join the secure network access platform</p>
+                </div>
+                <div class="card">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="regUsername" placeholder="Choose a username" onkeyup="validateForm()">
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="regEmail" placeholder="Enter your email" onkeyup="validateForm()">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="regPassword" placeholder="Create a secure password" onkeyup="validatePassword()">
+                        <div class="password-requirements" id="passwordRequirements">
+                            <div class="requirement" id="req-length">
+                                <i class="fas fa-times"></i> At least 8 characters
+                            </div>
+                            <div class="requirement" id="req-uppercase">
+                                <i class="fas fa-times"></i> One uppercase letter
+                            </div>
+                            <div class="requirement" id="req-lowercase">
+                                <i class="fas fa-times"></i> One lowercase letter
+                            </div>
+                            <div class="requirement" id="req-number">
+                                <i class="fas fa-times"></i> One number
+                            </div>
+                            <div class="requirement" id="req-special">
+                                <i class="fas fa-times"></i> One special character
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="register()" style="width: 100%;" id="registerBtn" disabled>
+                            <i class="fas fa-user-plus"></i> Create Account
+                        </button>
+                    </div>
+                </div>
+                <div class="auth-footer">
+                    <p>
+                        <a href="#" onclick="showLogin()">Already have an account?</a> | 
+                        <a href="#" onclick="showLanding()">Back to Home</a>
+                    </p>
+                </div>
             </div>
-            <button onclick="register()">Register</button>
-            
-            <h3>Login</h3>
-            <div class="form-group">
-                <label>Username:</label>
-                <input type="text" id="loginUsername" placeholder="Enter username">
+        </div>
+    </div>
+
+    <!-- Protected Section -->
+    <div id="protectedSection" class="protected-section">
+        <div class="top-nav">
+            <div class="container">
+                <div class="nav-content">
+                    <div class="nav-brand">ZTNA Security Gateway</div>
+                    <div class="nav-user">
+                        <span id="currentUser">Welcome, User</span>
+                        <button class="btn btn-danger" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i> Sign Out
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Password:</label>
-                <input type="password" id="loginPassword" placeholder="Enter password">
-            </div>
-            <button onclick="login()">Login</button>
         </div>
         
-        <div id="protectedSection" style="display: none;">
-            <h2>Protected Resources</h2>
-            <button onclick="accessResource()">Access Protected Resource</button>
-            <button onclick="checkSession()">Verify Session</button>
-            <button onclick="getDashboard()">View Dashboard</button>
-            <button onclick="getAnalytics()">View Analytics</button>
-            <button onclick="logout()">Logout</button>
+        <div class="container">
+            <div class="card">
+                <div class="section-title">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <h3>Security Dashboard</h3>
+                </div>
+                <div id="userInfo" class="stats-grid"></div>
+            </div>
+            
+            <div class="card">
+                <div class="section-title">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Secure Resources</h3>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="accessResource()">
+                        <i class="fas fa-database"></i> Access Data
+                    </button>
+                    <button class="btn btn-outline" onclick="checkSession()">
+                        <i class="fas fa-check-circle"></i> Verify Session
+                    </button>
+                    <button class="btn btn-outline" onclick="getDashboard()">
+                        <i class="fas fa-chart-line"></i> Dashboard
+                    </button>
+                    <button class="btn btn-outline" onclick="getAnalytics()">
+                        <i class="fas fa-analytics"></i> Analytics
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="section-title">
+                    <i class="fas fa-mobile-alt"></i>
+                    <h3>Authentication Devices</h3>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success" onclick="registerWebAuthn()">
+                        <i class="fas fa-plus"></i> Register Device
+                    </button>
+                    <button class="btn btn-outline" onclick="loadDevices()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                <div id="deviceList" class="device-list">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> No authentication devices registered yet. 
+                        Register a device for enhanced security.
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div id="response" class="response" style="display: none;"></div>
@@ -120,15 +624,105 @@
 
     <script>
         let currentToken = null;
-        const API_BASE = 'http://127.0.0.1:3001/api';
+        const API_BASE = 'https://enhanced-ztna-backend.onrender.com/api';
+        
+        // Navigation functions
+        function showLanding() {
+            document.getElementById('landingSection').style.display = 'flex';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('signupSection').style.display = 'none';
+            document.getElementById('protectedSection').style.display = 'none';
+        }
+        
+        function showLogin() {
+            document.getElementById('landingSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('signupSection').style.display = 'none';
+            document.getElementById('protectedSection').style.display = 'none';
+        }
+        
+        function showSignup() {
+            document.getElementById('landingSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('signupSection').style.display = 'block';
+            document.getElementById('protectedSection').style.display = 'none';
+        }
+        
+        function showDashboard() {
+            document.getElementById('landingSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('signupSection').style.display = 'none';
+            document.getElementById('protectedSection').style.display = 'block';
+        }
+        
+        // Password validation
+        function validatePassword() {
+            const password = document.getElementById('regPassword').value;
+            const requirements = {
+                'req-length': password.length >= 8,
+                'req-uppercase': /[A-Z]/.test(password),
+                'req-lowercase': /[a-z]/.test(password),
+                'req-number': /\d/.test(password),
+                'req-special': /[!@#$%^&*(),.?":{}|<>]/.test(password)
+            };
+            
+            for (const [id, valid] of Object.entries(requirements)) {
+                const element = document.getElementById(id);
+                if (valid) {
+                    element.classList.add('valid');
+                    element.classList.remove('invalid');
+                    element.querySelector('i').className = 'fas fa-check';
+                } else {
+                    element.classList.add('invalid');
+                    element.classList.remove('valid');
+                    element.querySelector('i').className = 'fas fa-times';
+                }
+            }
+            
+            validateForm();
+        }
+        
+        function validateForm() {
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            
+            const isValidPassword = password.length >= 8 && 
+                                  /[A-Z]/.test(password) && 
+                                  /[a-z]/.test(password) && 
+                                  /\d/.test(password) && 
+                                  /[!@#$%^&*(),.?":{}|<>]/.test(password);
+            
+            const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            
+            const registerBtn = document.getElementById('registerBtn');
+            if (username && isValidEmail && isValidPassword) {
+                registerBtn.disabled = false;
+                registerBtn.style.opacity = '1';
+            } else {
+                registerBtn.disabled = true;
+                registerBtn.style.opacity = '0.5';
+            }
+        }
+        
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `<i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'}"></i> ${message}`;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 4000);
+        }
         
         function showResponse(data, type = 'info') {
             const responseDiv = document.getElementById('response');
             responseDiv.className = `response ${type}`;
             responseDiv.textContent = JSON.stringify(data, null, 2);
             responseDiv.style.display = 'block';
+            setTimeout(() => responseDiv.style.display = 'none', 10000);
         }
         
+        // Authentication functions
         async function register() {
             const username = document.getElementById('regUsername').value;
             const email = document.getElementById('regEmail').value;
@@ -137,20 +731,26 @@
             try {
                 const response = await fetch(`${API_BASE}/register`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, email, password })
                 });
                 
                 const data = await response.json();
                 
                 if (response.ok) {
+                    showNotification('Account created successfully! Please sign in.', 'success');
                     showResponse(data, 'success');
+                    showLogin();
+                    // Clear form
+                    document.getElementById('regUsername').value = '';
+                    document.getElementById('regEmail').value = '';
+                    document.getElementById('regPassword').value = '';
                 } else {
+                    showNotification(data.error || 'Registration failed', 'error');
                     showResponse(data, 'error');
                 }
             } catch (error) {
+                showNotification('Network connection error', 'error');
                 showResponse({ error: error.message }, 'error');
             }
         }
@@ -159,12 +759,15 @@
             const username = document.getElementById('loginUsername').value;
             const password = document.getElementById('loginPassword').value;
             
+            if (!username || !password) {
+                showNotification('Please enter your credentials', 'error');
+                return;
+            }
+            
             try {
                 const response = await fetch(`${API_BASE}/login`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
                 
@@ -172,27 +775,174 @@
                 
                 if (response.ok) {
                     currentToken = data.token;
-                    document.getElementById('authSection').style.display = 'none';
-                    document.getElementById('protectedSection').style.display = 'block';
-                    showResponse(data, 'success');
+                    showLoginSuccess(data);
+                    showNotification(`Welcome back, ${username}`, 'success');
                 } else {
+                    showNotification(data.error || 'Authentication failed', 'error');
                     showResponse(data, 'error');
                 }
             } catch (error) {
+                showNotification('Network connection error', 'error');
                 showResponse({ error: error.message }, 'error');
             }
+        }
+        
+        async function loginWithWebAuthn() {
+            showNotification('WebAuthn login coming soon!', 'info');
+        }
+        
+        async function registerWebAuthn() {
+            if (!currentToken) {
+                showNotification('Please sign in first', 'error');
+                return;
+            }
+            
+            if (!window.SimpleWebAuthnBrowser || !window.PublicKeyCredential) {
+                showNotification('Biometric authentication not supported in this browser', 'error');
+                return;
+            }
+            
+            const deviceName = prompt('Enter a name for this device (e.g., "iPhone 15", "YubiKey"):') || 'Unknown Device';
+            
+            try {
+                showNotification('Initiating device registration...', 'info');
+                
+                const beginResponse = await fetch(`${API_BASE}/webauthn/register/begin`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const beginData = await beginResponse.json();
+                
+                if (!beginResponse.ok) {
+                    showNotification(beginData.error || 'Failed to start registration', 'error');
+                    return;
+                }
+                
+                showNotification('Please use your biometric sensor or security key', 'info');
+                
+                const credential = await SimpleWebAuthnBrowser.startRegistration(beginData);
+                
+                const finishResponse = await fetch(`${API_BASE}/webauthn/register/finish`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ credential, deviceName })
+                });
+                
+                const finishData = await finishResponse.json();
+                
+                if (finishResponse.ok) {
+                    showNotification('Device registered successfully', 'success');
+                    showResponse(finishData, 'success');
+                    loadDevices();
+                } else {
+                    showNotification(finishData.error || 'Registration failed', 'error');
+                    showResponse(finishData, 'error');
+                }
+                
+            } catch (error) {
+                if (error.name === 'NotAllowedError') {
+                    showNotification('Device registration was cancelled', 'error');
+                } else {
+                    showNotification(`Registration error: ${error.message}`, 'error');
+                }
+                showResponse({ error: error.message }, 'error');
+            }
+        }
+        
+        async function loadDevices() {
+            if (!currentToken) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/webauthn/devices`, {
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const deviceList = document.getElementById('deviceList');
+                    if (data.devices.length === 0) {
+                        deviceList.innerHTML = `
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> No authentication devices registered yet. 
+                                Register a device for enhanced security.
+                            </div>
+                        `;
+                    } else {
+                        deviceList.innerHTML = data.devices.map(device => `
+                            <div class="device-item">
+                                <div class="device-info">
+                                    <div class="device-icon">
+                                        <i class="fas fa-mobile-alt"></i>
+                                    </div>
+                                    <div class="device-details">
+                                        <h4>${device.device_name}</h4>
+                                        <p>Registered: ${new Date(device.created_at).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                                <div class="risk-indicator risk-low">Active</div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading devices:', error);
+            }
+        }
+        
+        function showLoginSuccess(data) {
+            showDashboard();
+            
+            const userInfoDiv = document.getElementById('userInfo');
+            const currentUserSpan = document.getElementById('currentUser');
+            const riskScore = data.session.riskScore;
+            const riskClass = riskScore < 30 ? 'risk-low' : riskScore < 60 ? 'risk-medium' : 'risk-high';
+            const riskLevel = riskScore < 30 ? 'LOW' : riskScore < 60 ? 'MEDIUM' : 'HIGH';
+            
+            currentUserSpan.textContent = `Welcome, ${data.user.username}`;
+            
+            userInfoDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${data.user.username}</div>
+                    <div class="stat-label">Current User</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value ${riskClass}">${riskScore}</div>
+                    <div class="stat-label">Risk Score</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">
+                        <span class="risk-indicator ${riskClass}">${riskLevel} RISK</span>
+                    </div>
+                    <div class="stat-label">Security Level</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">Active</div>
+                    <div class="stat-label">Session Status</div>
+                </div>
+            `;
+            
+            loadDevices();
+            showResponse(data, 'success');
         }
         
         async function accessResource() {
             try {
                 const response = await fetch(`${API_BASE}/protected/resource`, {
-                    headers: {
-                        'Authorization': `Bearer ${currentToken}`
-                    }
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
                 });
-                
                 const data = await response.json();
                 showResponse(data, response.ok ? 'success' : 'error');
+                if (response.ok) {
+                    showNotification('Access granted to secure resource', 'success');
+                }
             } catch (error) {
                 showResponse({ error: error.message }, 'error');
             }
@@ -202,13 +952,13 @@
             try {
                 const response = await fetch(`${API_BASE}/verify-session`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${currentToken}`
-                    }
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
                 });
-                
                 const data = await response.json();
                 showResponse(data, response.ok ? 'info' : 'error');
+                if (response.ok) {
+                    showNotification(`Session status: ${data.status}`, 'info');
+                }
             } catch (error) {
                 showResponse({ error: error.message }, 'error');
             }
@@ -217,11 +967,8 @@
         async function getDashboard() {
             try {
                 const response = await fetch(`${API_BASE}/dashboard`, {
-                    headers: {
-                        'Authorization': `Bearer ${currentToken}`
-                    }
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
                 });
-                
                 const data = await response.json();
                 showResponse(data, response.ok ? 'info' : 'error');
             } catch (error) {
@@ -232,11 +979,8 @@
         async function getAnalytics() {
             try {
                 const response = await fetch(`${API_BASE}/analytics`, {
-                    headers: {
-                        'Authorization': `Bearer ${currentToken}`
-                    }
+                    headers: { 'Authorization': `Bearer ${currentToken}` }
                 });
-                
                 const data = await response.json();
                 showResponse(data, response.ok ? 'info' : 'error');
             } catch (error) {
@@ -246,17 +990,18 @@
         
         function logout() {
             currentToken = null;
-            document.getElementById('authSection').style.display = 'block';
-            document.getElementById('protectedSection').style.display = 'none';
-            document.getElementById('response').style.display = 'none';
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+            showLanding();
+            showNotification('Signed out successfully', 'info');
         }
         
-        // Auto-refresh session verification every 30 seconds when logged in
-        setInterval(() => {
-            if (currentToken) {
-                checkSession();
-            }
-        }, 30000);
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            console.log('Checking WebAuthn support...');
+            console.log('SimpleWebAuthnBrowser available:', !!window.SimpleWebAuthnBrowser);
+            console.log('PublicKeyCredential available:', !!window.PublicKeyCredential);
+        });
     </script>
 </body>
 </html>

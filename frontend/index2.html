@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced ZTNA System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .risk-low { color: green; font-weight: bold; }
+        .risk-medium { color: orange; font-weight: bold; }
+        .risk-high { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Enhanced ZTNA System</h1>
+        <p>Zero Trust Network Access with Continuous Authentication</p>
+        
+        <div id="authSection">
+            <h2>Authentication</h2>
+            
+            <h3>Register New User</h3>
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" id="regUsername" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="regEmail" placeholder="Enter email">
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="regPassword" placeholder="Enter password">
+            </div>
+            <button onclick="register()">Register</button>
+            
+            <h3>Login</h3>
+            <div class="form-group">
+                <label>Username:</label>
+                <input type="text" id="loginUsername" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="loginPassword" placeholder="Enter password">
+            </div>
+            <button onclick="login()">Login</button>
+        </div>
+        
+        <div id="protectedSection" style="display: none;">
+            <h2>Protected Resources</h2>
+            <button onclick="accessResource()">Access Protected Resource</button>
+            <button onclick="checkSession()">Verify Session</button>
+            <button onclick="getDashboard()">View Dashboard</button>
+            <button onclick="getAnalytics()">View Analytics</button>
+            <button onclick="logout()">Logout</button>
+        </div>
+        
+        <div id="response" class="response" style="display: none;"></div>
+    </div>
+
+    <script>
+        let currentToken = null;
+        const API_BASE = 'http://127.0.0.1:3001/api';
+        
+        function showResponse(data, type = 'info') {
+            const responseDiv = document.getElementById('response');
+            responseDiv.className = `response ${type}`;
+            responseDiv.textContent = JSON.stringify(data, null, 2);
+            responseDiv.style.display = 'block';
+        }
+        
+        async function register() {
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResponse(data, 'success');
+                } else {
+                    showResponse(data, 'error');
+                }
+            } catch (error) {
+                showResponse({ error: error.message }, 'error');
+            }
+        }
+        
+        async function login() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentToken = data.token;
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('protectedSection').style.display = 'block';
+                    showResponse(data, 'success');
+                } else {
+                    showResponse(data, 'error');
+                }
+            } catch (error) {
+                showResponse({ error: error.message }, 'error');
+            }
+        }
+        
+        async function accessResource() {
+            try {
+                const response = await fetch(`${API_BASE}/protected/resource`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                showResponse(data, response.ok ? 'success' : 'error');
+            } catch (error) {
+                showResponse({ error: error.message }, 'error');
+            }
+        }
+        
+        async function checkSession() {
+            try {
+                const response = await fetch(`${API_BASE}/verify-session`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                showResponse(data, response.ok ? 'info' : 'error');
+            } catch (error) {
+                showResponse({ error: error.message }, 'error');
+            }
+        }
+        
+        async function getDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/dashboard`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                showResponse(data, response.ok ? 'info' : 'error');
+            } catch (error) {
+                showResponse({ error: error.message }, 'error');
+            }
+        }
+        
+        async function getAnalytics() {
+            try {
+                const response = await fetch(`${API_BASE}/analytics`, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+                
+                const data = await response.json();
+                showResponse(data, response.ok ? 'info' : 'error');
+            } catch (error) {
+                showResponse({ error: error.message }, 'error');
+            }
+        }
+        
+        function logout() {
+            currentToken = null;
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('protectedSection').style.display = 'none';
+            document.getElementById('response').style.display = 'none';
+        }
+        
+        // Auto-refresh session verification every 30 seconds when logged in
+        setInterval(() => {
+            if (currentToken) {
+                checkSession();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
