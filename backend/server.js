@@ -293,18 +293,20 @@ app.post('/api/login', async (req, res) => {
       
       if (!user) {
         console.log('❌ User not found:', username);
+        trackFailedAttempt(username, req.ip);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
         console.log('❌ Invalid password for:', username);
+        trackFailedAttempt(username, req.ip);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       // Calculate initial risk score
       const riskScore = calculateRiskScore(req, null, username);
-    // Clear failed attempts on successful login
+     // Clear failed attempts on successful login
       failedAttempts.delete(`${username}_${req.ip}`);
       
       // Create session
@@ -361,22 +363,6 @@ app.post('/api/login', async (req, res) => {
 
 // Track failed login attempts
 const failedAttempts = new Map(); // Store failed attempts temporarily
-
-// Update your login route's error handling
-// Find this part in your login route:
-if (!user) {
-  console.log('❌ User not found:', username);
-  // ADD THIS:
-  trackFailedAttempt(username, req.ip);
-  return res.status(401).json({ error: 'Invalid credentials' });
-}
-
-if (!isValid) {
-  console.log('❌ Invalid password for:', username);
-  // ADD THIS:
-  trackFailedAttempt(username, req.ip);
-  return res.status(401).json({ error: 'Invalid credentials' });
-}
 
 // Add this helper function
 function trackFailedAttempt(username, ip) {
