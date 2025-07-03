@@ -137,38 +137,77 @@ function initDB() {
   console.log('✅ Database tables initialized');
 }
 
-// Utility functions
-const calculateRiskScore = (req, session = null) => {
+const calculateRiskScore = (req, session = null, username = null) => {
   let risk = 0;
   
+  // Failed login attempts (NEW)
+  if (username) {
+    const recentFailures = getFailedAttempts(username, req.ip);
+    risk += recentFailures * 15; // 15 points per failed attempt
+  }
+  
   // Base risk (simulating ML algorithm)
-  risk += Math.floor(Math.random() * 15);
+  risk += Math.floor(Math.random() * 10);
+  
+  // Time-based risk (NEW - more realistic)
+  const hour = new Date().getHours();
+  if (hour < 6 || hour > 22) risk += 25; // Outside business hours
   
   // IP address change risk
   if (session && session.ip_address && session.ip_address !== req.ip) {
-    risk += 25;
+    risk += 30;
   }
   
   // User agent change risk
   if (session && session.user_agent && session.user_agent !== req.get('User-Agent')) {
-    risk += 20;
+    risk += 25;
   }
   
-  // Time-based risk (session age)
+  // Session duration risk
   if (session && session.last_activity) {
     const now = new Date();
     const lastActivity = new Date(session.last_activity);
     const hoursInactive = (now - lastActivity) / (1000 * 60 * 60);
     
-    if (hoursInactive > 4) risk += 10;
-    if (hoursInactive > 12) risk += 20;
+    if (hoursInactive > 2) risk += 15;
+    if (hoursInactive > 6) risk += 25;
   }
-  
-  // Geographic risk (simulated - in real implementation would use IP geolocation)
-  if (Math.random() > 0.8) risk += 15; // 20% chance of "unusual location"
   
   return Math.min(risk, 100);
 };
+
+// // Utility functions
+// const calculateRiskScore = (req, session = null) => {
+//   let risk = 0;
+  
+//   // Base risk (simulating ML algorithm)
+//   risk += Math.floor(Math.random() * 15);
+  
+//   // IP address change risk
+//   if (session && session.ip_address && session.ip_address !== req.ip) {
+//     risk += 25;
+//   }
+  
+//   // User agent change risk
+//   if (session && session.user_agent && session.user_agent !== req.get('User-Agent')) {
+//     risk += 20;
+//   }
+  
+//   // Time-based risk (session age)
+//   if (session && session.last_activity) {
+//     const now = new Date();
+//     const lastActivity = new Date(session.last_activity);
+//     const hoursInactive = (now - lastActivity) / (1000 * 60 * 60);
+    
+//     if (hoursInactive > 4) risk += 10;
+//     if (hoursInactive > 12) risk += 20;
+//   }
+  
+//   // Geographic risk (simulated - in real implementation would use IP geolocation)
+//   if (Math.random() > 0.8) risk += 15; // 20% chance of "unusual location"
+  
+//   return Math.min(risk, 100);
+// };
 
 const logRiskEvent = (userId, eventType, riskValue, description) => {
   db.run(
@@ -264,7 +303,9 @@ app.post('/api/login', async (req, res) => {
       }
 
       // Calculate initial risk score
-      const riskScore = calculateRiskScore(req);
+      const riskScore = calculateRiskScore(req, null, username);
+    // Clear failed attempts on successful login
+      failedAttempts.delete(`${username}_${req.ip}`);
       
       // Create session
       const sessionId = uuidv4();
@@ -317,6 +358,42 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Track failed login attempts
+const failedAttempts = new Map(); // Store failed attempts temporarily
+
+// Update your login route's error handling
+// Find this part in your login route:
+if (!user) {
+  console.log('❌ User not found:', username);
+  // ADD THIS:
+  trackFailedAttempt(username, req.ip);
+  return res.status(401).json({ error: 'Invalid credentials' });
+}
+
+if (!isValid) {
+  console.log('❌ Invalid password for:', username);
+  // ADD THIS:
+  trackFailedAttempt(username, req.ip);
+  return res.status(401).json({ error: 'Invalid credentials' });
+}
+
+// Add this helper function
+function trackFailedAttempt(username, ip) {
+  const key = `${username}_${ip}`;
+  const attempts = failedAttempts.get(key) || [];
+  attempts.push(new Date());
+  
+  // Keep only attempts from last 15 minutes
+  const recent = attempts.filter(time => Date.now() - time.getTime() < 15 * 60 * 1000);
+  failedAttempts.set(key, recent);
+}
+
+function getFailedAttempts(username, ip) {
+  const key = `${username}_${ip}`;
+  const attempts = failedAttempts.get(key) || [];
+  return attempts.filter(time => Date.now() - time.getTime() < 15 * 60 * 1000).length;
+}
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -679,6 +756,57 @@ app.get('/api/admin/stats', (req, res) => {
         lastUpdated: new Date().toISOString()
       });
     });
+  });
+});
+
+// Risk simulation endpoint for demos
+app.post('/api/simulate-risk', authenticateToken, (req, res) => {
+  const { riskType, riskLevel } = req.body;
+  const { userId, username } = req.user;
+  
+  const scenarios = {
+    'suspicious_location': {
+      message: '🚨 Suspicious login detected from unusual location (Nigeria)',
+      riskScore: riskLevel || 85,
+      requiredAction: 'Additional verification required'
+    },
+    'multiple_devices': {
+      message: '⚠️ Multiple concurrent sessions detected from different devices',
+      riskScore: riskLevel || 70,
+      requiredAction: 'Device verification recommended'
+    },
+    'unusual_time': {
+      message: '🌙 Access attempt at 3:47 AM - outside normal hours',
+      riskScore: riskLevel || 60,
+      requiredAction: 'Enhanced monitoring enabled'
+    },
+    'failed_attempts': {
+      message: '🔒 Multiple failed login attempts detected',
+      riskScore: riskLevel || 75,
+      requiredAction: 'Account temporarily restricted'
+    }
+  };
+  
+  const scenario = scenarios[riskType] || scenarios['suspicious_location'];
+  
+  // Log the risk event
+  logRiskEvent(userId, riskType, scenario.riskScore, scenario.message);
+  
+  console.log(`🚨 Risk simulation: ${riskType} for user ${username}`);
+  
+  res.json({
+    alert: true,
+    riskScore: scenario.riskScore,
+    riskLevel: scenario.riskScore > 70 ? 'HIGH' : 'MEDIUM',
+    message: scenario.message,
+    requiredAction: scenario.requiredAction,
+    timestamp: new Date().toISOString(),
+    recommendations: [
+      'Enable WebAuthn for stronger authentication',
+      'Review recent account activity',
+      'Consider changing password if unauthorized access suspected',
+      'Contact security team if you did not initiate this activity'
+    ]
   });
 });
 
